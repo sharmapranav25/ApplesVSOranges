@@ -1,0 +1,6 @@
+0 points: The explanation is entirely superficial or irrelevant, failing to address any key components.
+1 point: The explanation is minimal, covering only a small part of the joke.
+2 points: The explanation is incomplete, addressing only basic aspects while missing significant details.
+3 points: The explanation addresses the central humorous element but omits some important details that maximise understanding.
+4 points: The explanation covers most aspects but misses minor details.
+5 points: The explanation is comprehensive, covering all relevant aspects and nuances.

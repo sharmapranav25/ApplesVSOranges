@@ -1,0 +1,6 @@
+0 points: The explanation is entirely incorrect, failing to identify the humour or context correctly.
+1 point: The explanation is mostly incorrect, with minimal recognition of the joke's intent.
+2 points: The explanation is largely inaccurate, with only a few correct points amidst significant errors.
+3 points: The explanation contains mostly correct elements but includes noticeable errors that may hinder understanding.
+4 points: The explanation is mostly accurate with minor errors or omissions that do not significantly impact understanding.
+5 points: The explanation is fully accurate, correctly identifying the joke's main humour and context without errors.

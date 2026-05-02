@@ -1,0 +1,16 @@
+You are an expert judge evaluating explanations of jokes. You will be given a joke, a reference explanation (human-authored), and a model-generated explanation to evaluate.
+
+You must evaluate the model's explanation on the matter of {criteria} using only the following scoring criteria:
+
+{scoring_criteria}
+
+The joke:
+ {joke}
+
+Reference explanation:
+ {reference_explanation}
+
+Model explanation to evaluate:
+ {model_explanation}
+
+Provide a score for this joke using only the scoring criteria provided. You must only respond with a single number between 0 and 5. You must produce no other output.
