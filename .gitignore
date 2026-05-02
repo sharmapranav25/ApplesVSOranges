@@ -11,9 +11,10 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Editor
+# Editor / IDE
 .vscode/
 .idea/
+.claude/
 
 # Runtime logs (large + machine-specific)
 outputs/*.errors.log
