@@ -7,17 +7,25 @@ pandas>=2.1.0
 tqdm>=4.66.0
 requests>=2.31.0
 
-# Metrics (Task 4)
+# Metrics
 sacrebleu>=2.4.0
 rouge-score>=0.1.2
 nltk>=3.9.0
 bert-score>=0.3.13
 
-# LLM judge — local backend (Task 3)
+# LLM judge — local backend
 torch>=2.2.0
 transformers>=4.45.0
 accelerate>=0.34.0
-bitsandbytes>=0.43.0  # NOTE: not installable on macOS; required only for --backend local on the HPC node
+bitsandbytes>=0.46.1
+
+# Stats / analysis (Member 2)
+scipy>=1.12.0
+scikit-learn>=1.4.0
+
+# Notebook + plotting (Member 2)
+jupyter>=1.0.0
+matplotlib>=3.8.0
 
 # Tests
 pytest>=8.0.0
