@@ -29,3 +29,5 @@ matplotlib>=3.8.0
 
 # Tests
 pytest>=8.0.0
+
+numpy

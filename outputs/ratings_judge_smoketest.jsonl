@@ -1,0 +1,4 @@
+{"joke_id": "topical_000", "model": "gpt-4o", "criterion": "accuracy", "score": 4, "annotator": "qwen2.5-7b-instruct"}
+{"joke_id": "topical_000", "model": "gpt-4o", "criterion": "completeness", "score": 4, "annotator": "qwen2.5-7b-instruct"}
+{"joke_id": "topical_000", "model": "gpt-4o-mini", "criterion": "accuracy", "score": 4, "annotator": "qwen2.5-7b-instruct"}
+{"joke_id": "topical_000", "model": "gpt-4o-mini", "criterion": "completeness", "score": 4, "annotator": "qwen2.5-7b-instruct"}
