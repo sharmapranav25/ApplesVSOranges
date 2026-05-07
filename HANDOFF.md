@@ -11,11 +11,14 @@ EMNLP 2025 Findings paper (Loakman et al., humour explanation). All 4 build task
 | `src/judge.py` (**Qwen2.5-7B**, deviation from paper's 72B) | ✅ implemented, resumable, switchable backend — **not yet run** against the real API |
 | `src/metrics.py` (BLEU/ROUGE/METEOR/BERTScore) | ✅ implemented, sanity-checked against Table 2 |
 | `data/explanations.jsonl` | ⚠️ dev copy derived from CSV; **swap when teammate delivers** |
-| `outputs/ratings_judge.jsonl` | ❌ not yet produced — run the judge |
+| `outputs/ratings_judge.jsonl` | ✅ 9,600 paper-Qwen-72B ratings (cross-scale baseline) via `run_judge.ipynb` |
 | `outputs/ratings_judge_paper.jsonl` | ✅ 9600 paper-Qwen-**72B** ratings extracted from CSV (cross-scale baseline only — we judge with 7B) |
-| `outputs/metrics.csv` | partial (1 row from a smoke run) — re-run for the full 32 |
+| `outputs/metrics.csv` | ✅ 32 rows (8 models × 4 types) |
+| **`src/analyze.py`** — figures + tables | ✅ **all outputs produced** |
+| **`outputs/figures/`** (4 figures) | ✅ fig3b, fig3c, fig4, judge comparison |
+| **`outputs/tables/`** (5 tables) | ✅ avg scores, success rates, gap, logreg, agreement |
 
-## Next steps (in order)
+## Next steps (in order) (DONE)
 
 1. **When teammate's `data/explanations.jsonl` arrives**, replace the dev copy and verify model slugs match `MODEL_SLUG_MAP` in `src/schema.py`.
 2. Run the judge → `outputs/ratings_judge.jsonl`. ~9600 calls. Pick one:

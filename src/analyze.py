@@ -16,6 +16,7 @@ Produces in outputs/figures/:
 Produces in outputs/tables/:
   avg_scores.csv           — mean accuracy + completeness per model x type
   success_rates.csv        — fraction of (acc>=4 AND comp>=4) per model x type
+  hypothesis_checks.csv    — H1–H4 results with values, delta, and verdict
   replication_gap.csv      — our metrics vs paper Table 2 (GPT-4o row)
   logistic_regression.csv  — beta / p-value per feature
   judge_agreement.csv      — Pearson r, MAE, Cohen kappa vs paper 72B judge
@@ -50,7 +51,7 @@ import pandas as pd
 
 log = logging.getLogger("analyze")
 
-# ── canonical ordering (mirrors schema.py) ────────────────────────────────────
+# canonical ordering and labels for plots and tables. See schema.py for the single source of truth
 
 from schema import JOKE_TYPES, CRITERIA
 
@@ -62,16 +63,24 @@ JOKE_LABELS = {
 }
 
 MODEL_ORDER = [
-    "r1-distill-llama-70b", "r1-distill-llama-8b",
-    "gpt-4o",               "gpt-4o-mini",
-    "gemini-1.5-pro",       "gemini-1.5-flash",
-    "llama-3.1-70b",        "llama-3.1-8b",
+    "r1-distill-llama-70b", 
+    "r1-distill-llama-8b",
+    "gpt-4o",               
+    "gpt-4o-mini",
+    "gemini-1.5-pro",       
+    "gemini-1.5-flash",
+    "llama-3.1-70b",        
+    "llama-3.1-8b",
 ]
 MODEL_LABELS = {
-    "r1-distill-llama-70b": "R1 70B",    "r1-distill-llama-8b": "R1 8B",
-    "gpt-4o":               "GPT-4o",    "gpt-4o-mini":         "GPT-4o Mini",
-    "gemini-1.5-pro":       "Gemini Pro","gemini-1.5-flash":    "Gemini Flash",
-    "llama-3.1-70b":        "Llama 70B", "llama-3.1-8b":        "Llama 8B",
+    "r1-distill-llama-70b": "R1 70B",
+    "r1-distill-llama-8b": "R1 8B",
+    "gpt-4o":               "GPT-4o",
+    "gpt-4o-mini":         "GPT-4o Mini",
+    "gemini-1.5-pro":       "Gemini Pro",
+    "gemini-1.5-flash":    "Gemini Flash",
+    "llama-3.1-70b":        "Llama 70B",
+    "llama-3.1-8b":        "Llama 8B",
 }
 MODEL_COLORS = [
     "#555555", "#aaaaaa",
@@ -116,7 +125,7 @@ def compute_success_rate(df: pd.DataFrame) -> pd.DataFrame:
                .mean().reset_index().rename(columns={"is_good": "success_rate"}))
 
 
-# ── plotting ──────────────────────────────────────────────────────────────────
+# plotting helpers
 
 def _setup_matplotlib() -> None:
     import matplotlib
@@ -217,7 +226,7 @@ def judge_comparison_plot(ours: pd.DataFrame, paper: pd.DataFrame,
     log.info("saved %s", out_path)
 
 
-# ── tables ────────────────────────────────────────────────────────────────────
+# table generation helpers
 
 def save_avg_scores(df: pd.DataFrame, out_path: Path) -> pd.DataFrame:
     avg = (df.groupby(["model", "joke_type", "criterion"])["score"]
@@ -331,70 +340,171 @@ def save_judge_agreement(ours: pd.DataFrame, paper: pd.DataFrame,
     return result
 
 
-# ── console report ────────────────────────────────────────────────────────────
+def save_hypothesis_checks(avg: pd.DataFrame, sr: pd.DataFrame,
+                           out_path: Path) -> pd.DataFrame:
+    """Compute H1–H4 and save to CSV.
+
+    Columns: hypothesis, description, value_a, label_a, value_b, label_b,
+             delta, verdict, note
+    """
+    acc = avg[avg["criterion"] == "accuracy"]
+    by_type = acc.groupby("joke_type")["mean_score"].mean()
+
+    hom = by_type.get("homographic",   0.0)
+    het = by_type.get("heterographic", 0.0)
+    ntp = by_type.get("non_topical",   0.0)
+    top = by_type.get("topical",       0.0)
+
+    def verdict(a, b, near_tie_threshold=0.05):
+        delta = a - b
+        if abs(delta) < near_tie_threshold:
+            return "NEAR-TIE"
+        return "CONFIRMED" if delta > 0 else "FAILED"
+
+    rows = []
+
+    # H1: puns (avg of hom+het) vs reddit (avg of ntp+top)
+    pun_avg    = (hom + het) / 2
+    reddit_avg = (ntp + top) / 2
+    rows.append({
+        "hypothesis":  "H1",
+        "description": "Traditional puns easier to explain than Reddit jokes",
+        "value_a":     round(pun_avg, 4),
+        "label_a":     "puns (avg hom+het accuracy)",
+        "value_b":     round(reddit_avg, 4),
+        "label_b":     "reddit (avg ntp+top accuracy)",
+        "delta":       round(pun_avg - reddit_avg, 4),
+        "verdict":     verdict(pun_avg, reddit_avg),
+        "note":        "Δ<0.05 → near-tie due to 7B judge score compression",
+    })
+
+    # H2: homographic > heterographic
+    rows.append({
+        "hypothesis":  "H2",
+        "description": "Homographic puns easier than heterographic puns",
+        "value_a":     round(hom, 4),
+        "label_a":     "homographic accuracy",
+        "value_b":     round(het, 4),
+        "label_b":     "heterographic accuracy",
+        "delta":       round(hom - het, 4),
+        "verdict":     verdict(hom, het),
+        "note":        "",
+    })
+
+    # H3: topical hardest (topical < non_topical)
+    rows.append({
+        "hypothesis":  "H3",
+        "description": "Topical jokes harder than non-topical Reddit jokes",
+        "value_a":     round(ntp, 4),
+        "label_a":     "non_topical accuracy",
+        "value_b":     round(top, 4),
+        "label_b":     "topical accuracy",
+        "delta":       round(ntp - top, 4),
+        "verdict":     verdict(ntp, top),
+        "note":        "Δ<0.05 → near-tie due to 7B judge score compression",
+    })
+
+    # H4: larger > smaller per family (use overall success rate)
+    pairs = [
+        ("gpt-4o",               "gpt-4o-mini",          "GPT-4o family"),
+        ("gemini-1.5-pro",       "gemini-1.5-flash",     "Gemini 1.5 family"),
+        ("llama-3.1-70b",        "llama-3.1-8b",         "Llama 3.1 family"),
+        ("r1-distill-llama-70b", "r1-distill-llama-8b",  "R1 family"),
+    ]
+    for big, small, family in pairs:
+        b = sr[sr["model"] == big]["success_rate"].mean()
+        s = sr[sr["model"] == small]["success_rate"].mean()
+        rows.append({
+            "hypothesis":  "H4",
+            "description": f"Larger model > smaller model — {family}",
+            "value_a":     round(b, 4),
+            "label_a":     f"{big} success rate",
+            "value_b":     round(s, 4),
+            "label_b":     f"{small} success rate",
+            "delta":       round(b - s, 4),
+            "verdict":     verdict(b, s),
+            "note":        "near-tied" if abs(b - s) < 0.05 else "",
+        })
+
+    result = pd.DataFrame(rows)
+    result.to_csv(out_path, index=False)
+    log.info("saved %s", out_path)
+    return result
+
+
+# hypothesis checks and console report
 
 def print_report(avg: pd.DataFrame, sr: pd.DataFrame,
                  logreg: pd.DataFrame, gap: pd.DataFrame,
-                 agreement: pd.DataFrame) -> None:
+                 agreement: pd.DataFrame,
+                 out_path: Path) -> None:
 
     acc = avg[avg["criterion"] == "accuracy"]
     by_type = acc.groupby("joke_type")["mean_score"].mean()
     hom = by_type.get("homographic", 0);  het = by_type.get("heterographic", 0)
     ntp = by_type.get("non_topical", 0);  top = by_type.get("topical", 0)
 
-    print("\n" + "=" * 64)
-    print("  RESULTS SUMMARY")
-    print("=" * 64)
+    lines = []
 
-    print("\n  Avg accuracy by joke type:")
+    def emit(text=""):
+        print(text)
+        lines.append(text)
+
+    emit("\n" + "=" * 64)
+    emit("  RESULTS SUMMARY")
+    emit("=" * 64)
+
+    emit("\n  Avg accuracy by joke type:")
     for jt in JOKE_TYPES:
-        print(f"    {JOKE_LABELS[jt]:<16} {by_type.get(jt, 0):.3f}")
+        emit(f"    {JOKE_LABELS[jt]:<16} {by_type.get(jt, 0):.3f}")
 
-    print("\n  Hypothesis checks (accuracy):")
-    print(f"    H1 Puns > Reddit?        {(hom+het)/2:.3f} vs {(ntp+top)/2:.3f}  "
-          f"{'CONFIRMED' if (hom+het)/2 > (ntp+top)/2 else 'FAILED'}")
-    print(f"    H2 Homographic > Hetero? {hom:.3f} vs {het:.3f}  "
-          f"{'CONFIRMED' if hom > het else 'FAILED'}")
-    print(f"    H3 Topical hardest?      non_top={ntp:.3f} topical={top:.3f}  "
-          f"{'CONFIRMED' if top < ntp else 'FAILED'}")
+    emit("\n  Hypothesis checks (accuracy):")
+    emit(f"    H1 Puns > Reddit?        {(hom+het)/2:.3f} vs {(ntp+top)/2:.3f}  "
+         f"{'CONFIRMED' if (hom+het)/2 > (ntp+top)/2 else 'FAILED'}")
+    emit(f"    H2 Homographic > Hetero? {hom:.3f} vs {het:.3f}  "
+         f"{'CONFIRMED' if hom > het else 'FAILED'}")
+    emit(f"    H3 Topical hardest?      non_top={ntp:.3f} topical={top:.3f}  "
+         f"{'CONFIRMED' if top < ntp else 'FAILED'}")
 
     pairs = [("gpt-4o","gpt-4o-mini"),("gemini-1.5-pro","gemini-1.5-flash"),
              ("llama-3.1-70b","llama-3.1-8b"),
              ("r1-distill-llama-70b","r1-distill-llama-8b")]
-    print("\n    H4 Larger > Smaller?")
+    emit("\n    H4 Larger > Smaller?")
     for big, small in pairs:
         b = acc[acc["model"] == big]["mean_score"].mean()
         s = acc[acc["model"] == small]["mean_score"].mean()
-        print(f"       {'OK' if b > s else 'FAIL'}  "
-              f"{MODEL_LABELS.get(big,big)} ({b:.3f}) vs "
-              f"{MODEL_LABELS.get(small,small)} ({s:.3f})")
+        emit(f"       {'OK' if b > s else 'FAIL'}  "
+             f"{MODEL_LABELS.get(big,big)} ({b:.3f}) vs "
+             f"{MODEL_LABELS.get(small,small)} ({s:.3f})")
 
     if not logreg.empty:
-        print("\n  Logistic regression (paper: β_large=1.707, β_topical=-0.574):")
+        emit("\n  Logistic regression (paper: β_large=1.707, β_topical=-0.574):")
         PAPER_B = {"is_large": 1.707, "is_non_topical": -0.511, "is_topical": -0.574}
         for _, r in logreg.iterrows():
             p = "p<0.001" if r.p_value < 0.001 else f"p={r.p_value:.3f}"
             pb = f"{PAPER_B[r.feature]:+.3f}" if r.feature in PAPER_B else "   n/a"
-            print(f"    {r.feature:<22} β={r.beta:+.3f}  paper={pb}  {p}")
+            emit(f"    {r.feature:<22} β={r.beta:+.3f}  paper={pb}  {p}")
 
     if not agreement.empty:
-        print("\n  Judge agreement (our 7B vs paper 72B):")
+        emit("\n  Judge agreement (our 7B vs paper 72B):")
         for _, r in agreement.iterrows():
-            print(f"    {r.criterion.capitalize():<14} "
-                  f"r={r.pearson_r:.3f}  MAE={r.mae:.3f}  "
-                  f"κ={r.cohen_kappa:.3f}  within±1={r.within_1:.1%}")
-        print("    (Paper reports r=0.641/0.602 for 72B vs human)")
+            emit(f"    {r.criterion.capitalize():<14} "
+                 f"r={r.pearson_r:.3f}  MAE={r.mae:.3f}  "
+                 f"κ={r.cohen_kappa:.3f}  within±1={r.within_1:.1%}")
+        emit("    (Paper reports r=0.641/0.602 for 72B vs human)")
 
     if not gap.empty:
         bleu = gap[gap["metric"] == "sacrebleu"].set_index("joke_type")["pct_diff"]
-        print("\n  Replication gap — SacreBLEU vs paper Table 2 (GPT-4o):")
+        emit("\n  Replication gap — SacreBLEU vs paper Table 2 (GPT-4o):")
         for jt in JOKE_TYPES:
             v = bleu.get(jt)
-            print(f"    {JOKE_LABELS[jt]:<16} {f'{v:+.1f}%' if v else 'n/a':>8}")
-        print("    BERTScore gap is <0.5% — treated as matched.")
+            emit(f"    {JOKE_LABELS[jt]:<16} {f'{v:+.1f}%' if v else 'n/a':>8}")
+        emit("    BERTScore gap is <0.5% — treated as matched.")
+
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    log.info("saved %s", out_path)
 
 
-# ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Produce figures and tables for the paper")
@@ -412,7 +522,7 @@ def main() -> None:
     fig_dir.mkdir(parents=True, exist_ok=True)
     tab_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── load ratings ──────────────────────────────────────────────────────────
+    # load data
     if not args.ratings.exists():
         raise SystemExit(f"ratings not found at {args.ratings} — run judge.py first")
     log.info("loading ratings from %s", args.ratings)
@@ -426,7 +536,7 @@ def main() -> None:
     else:
         log.warning("paper ratings not found at %s — skipping comparison", args.paper_ratings)
 
-    # ── average scores ────────────────────────────────────────────────────────
+    # average scores by model x joke type x criterion, for Figures 3b and 3c and Table of avg scores
     avg = save_avg_scores(df, tab_dir / "avg_scores.csv")
 
     grouped_bar(avg[avg["criterion"] == "accuracy"],
@@ -439,29 +549,34 @@ def main() -> None:
                 "Figure 3c — Completeness by Model and Joke Type",
                 fig_dir / "fig3c_completeness.png")
 
-    # ── success rates ─────────────────────────────────────────────────────────
+    # success rates (accuracy>=4 AND completeness>=4) by model x joke type, for Figure 4 and Table of success rates
     sr = compute_success_rate(df)
     save_success_rates(sr, tab_dir / "success_rates.csv")
     success_grid(sr, fig_dir / "fig4_success.png")
 
-    # ── judge comparison ──────────────────────────────────────────────────────
+    # hypothesis checks H1-H4 saved to CSV
+    hyp = save_hypothesis_checks(avg, sr, tab_dir / "hypothesis_checks.csv")
+
+    # judge agreement vs paper 72B judge, for judge_comparison_plot and agreement table
     if not paper_df.empty:
         judge_comparison_plot(df, paper_df, fig_dir / "fig_judge_comparison.png")
         agreement = save_judge_agreement(df, paper_df, tab_dir / "judge_agreement.csv")
     else:
         agreement = pd.DataFrame()
 
-    # ── replication gap ───────────────────────────────────────────────────────
+    # replication
     gap = save_replication_gap(args.metrics, tab_dir / "replication_gap.csv")
 
-    # ── logistic regression ───────────────────────────────────────────────────
+    # logistic regression for good explanation (accuracy>=4 AND completeness>=4) with features for large model and topical/heterographic joke type, for Table of logistic regression results
     logreg = save_logistic_regression(df, tab_dir / "logistic_regression.csv")
 
-    # ── console report ────────────────────────────────────────────────────────
-    print_report(avg, sr, logreg, gap, agreement)
+    # summary report — printed to console and saved to file
+    print_report(avg, sr, logreg, gap, agreement,
+                 out_path=args.outdir / "results_summary.txt")
 
-    print(f"\n  Figures → {fig_dir.resolve()}")
-    print(f"  Tables  → {tab_dir.resolve()}")
+    print(f"\n  Figures  → {fig_dir.resolve()}")
+    print(f"  Tables   → {tab_dir.resolve()}")
+    print(f"  Summary  → {(args.outdir / 'results_summary.txt').resolve()}")
 
 
 if __name__ == "__main__":
