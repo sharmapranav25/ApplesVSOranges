@@ -49,6 +49,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 import numpy as np
 import pandas as pd
 
+# Silence the harmless "Unable to import Axes3D" matplotlib warning
+warnings.filterwarnings("ignore", message="Unable to import Axes3D")
+
 log = logging.getLogger("analyze")
 
 # canonical ordering and labels for plots and tables. See schema.py for the single source of truth
@@ -62,39 +65,65 @@ JOKE_LABELS = {
     "topical":       "Topical",
 }
 
+# Your 5 models — paper-match models first, then extension models.
+# Fallback to paper models if this file is run on paper data directly.
 MODEL_ORDER = [
-    "r1-distill-llama-70b", 
-    "r1-distill-llama-8b",
-    "gpt-4o",               
-    "gpt-4o-mini",
-    "gemini-1.5-pro",       
-    "gemini-1.5-flash",
-    "llama-3.1-70b",        
-    "llama-3.1-8b",
+    "r1-distill-llama-8b",   # paper match
+    "llama-3.1-8b",           # paper match
+    "llama-3.2-3b",           # extension
+    "gemma-2-2b",             # extension (small Gemma — H4 pair)
+    "gemma-2-9b",             # extension (large Gemma — H4 pair)
+    # paper-only models kept so plots work if run on ratings_judge_paper.jsonl too
+    "r1-distill-llama-70b", "gpt-4o", "gpt-4o-mini",
+    "gemini-1.5-pro", "gemini-1.5-flash", "llama-3.1-70b",
 ]
 MODEL_LABELS = {
-    "r1-distill-llama-70b": "R1 70B",
-    "r1-distill-llama-8b": "R1 8B",
-    "gpt-4o":               "GPT-4o",
-    "gpt-4o-mini":         "GPT-4o Mini",
-    "gemini-1.5-pro":       "Gemini Pro",
-    "gemini-1.5-flash":    "Gemini Flash",
-    "llama-3.1-70b":        "Llama 70B",
-    "llama-3.1-8b":        "Llama 8B",
+    "r1-distill-llama-8b":  "R1-Llama 8B",
+    "llama-3.1-8b":         "Llama 3.1 8B",
+    "llama-3.2-3b":         "Llama 3.2 3B",
+    "gemma-2-2b":           "Gemma 2 2B",
+    "gemma-2-9b":           "Gemma 2 9B",
+    # paper models
+    "r1-distill-llama-70b": "R1 70B",    "gpt-4o":          "GPT-4o",
+    "gpt-4o-mini":          "GPT-4o Mini","gemini-1.5-pro":  "Gemini Pro",
+    "gemini-1.5-flash":     "Gemini Flash","llama-3.1-70b":  "Llama 70B",
+    "llama-3.1-8b":         "Llama 3.1 8B",
 }
+# One colour per MODEL_ORDER entry (first 5 = your models)
 MODEL_COLORS = [
-    "#555555", "#aaaaaa",
-    "#d62728", "#ff9896",
-    "#2ca02c", "#98df8a",
-    "#1f77b4", "#aec7e8",
+    "#555555",  # R1-Llama 8B      — dark grey
+    "#1f77b4",  # Llama 3.1 8B     — dark blue
+    "#aec7e8",  # Llama 3.2 3B     — light blue
+    "#98df8a",  # Gemma 2 2B       — light green
+    "#2ca02c",  # Gemma 2 9B       — dark green
+    # fallback colours for paper models (used only when running on paper data)
+    "#aaaaaa", "#d62728", "#ff9896", "#e377c2", "#f7b6d2", "#8c564b",
 ]
 
-# Paper Table 2 (GPT-4o) for replication gap
+# Within-family size pairs for H4 (single source of truth — used by both
+# save_hypothesis_checks and print_report)
+H4_PAIRS = [
+    # (big_model, small_model, family_label, h4_kind)
+    ("gemma-2-9b",   "gemma-2-2b",   "Gemma 2 family (9B vs 2B)",                    "clean"),
+    ("llama-3.1-8b", "llama-3.2-3b", "Llama family (3.1-8B vs 3.2-3B, cross-gen)",   "cross-gen"),
+]
+
+
+# Paper Table 2 values for your two paper-match models (from Appendix A.4).
+# Used in save_replication_gap to show how close your runs got.
 PAPER_TABLE2 = {
-    "heterographic": dict(sacrebleu=8.53, rouge1=0.41, rouge2=0.12, rougeL=0.25, meteor=0.37, bertscore=0.88),
-    "homographic":   dict(sacrebleu=10.15,rouge1=0.43, rouge2=0.15, rougeL=0.28, meteor=0.39, bertscore=0.89),
-    "non_topical":   dict(sacrebleu=7.86, rouge1=0.41, rouge2=0.13, rougeL=0.25, meteor=0.32, bertscore=0.88),
-    "topical":       dict(sacrebleu=7.09, rouge1=0.40, rouge2=0.12, rougeL=0.23, meteor=0.32, bertscore=0.87),
+    "llama-3.1-8b": {
+        "heterographic": dict(sacrebleu=9.76,  rouge1=0.42, rouge2=0.14, rougeL=0.27, meteor=0.36, bertscore=0.89),
+        "homographic":   dict(sacrebleu=8.41,  rouge1=0.39, rouge2=0.12, rougeL=0.24, meteor=0.34, bertscore=0.88),
+        "non_topical":   dict(sacrebleu=7.16,  rouge1=0.40, rouge2=0.12, rougeL=0.24, meteor=0.30, bertscore=0.87),
+        "topical":       dict(sacrebleu=5.83,  rouge1=0.36, rouge2=0.10, rougeL=0.22, meteor=0.28, bertscore=0.87),
+    },
+    "r1-distill-llama-8b": {
+        "heterographic": dict(sacrebleu=6.48,  rouge1=0.37, rouge2=0.10, rougeL=0.23, meteor=0.28, bertscore=0.88),
+        "homographic":   dict(sacrebleu=5.25,  rouge1=0.35, rouge2=0.08, rougeL=0.21, meteor=0.25, bertscore=0.87),
+        "non_topical":   dict(sacrebleu=4.85,  rouge1=0.36, rouge2=0.09, rougeL=0.22, meteor=0.24, bertscore=0.87),
+        "topical":       dict(sacrebleu=4.12,  rouge1=0.33, rouge2=0.08, rougeL=0.20, meteor=0.23, bertscore=0.86),
+    },
 }
 
 
@@ -172,9 +201,25 @@ def success_grid(sr: pd.DataFrame, out_path: Path) -> None:
     models = [m for m in MODEL_ORDER if m in sr["model"].unique()]
     jtypes = [t for t in JOKE_TYPES   if t in sr["joke_type"].unique()]
 
-    fig, axes = plt.subplots(2, 4, figsize=(14, 6), sharey=True, sharex=True)
+    # Auto-size grid:
+    #  - n ≤ 5: single row (n columns), looks cleanest
+    #  - n > 5: max 4 cols, multi-row, hide unused cells
+    n = len(models)
+    if n == 0:
+        log.warning("success_grid: no models in data — skipping %s", out_path)
+        return
+    if n <= 5:
+        ncols, nrows = n, 1
+    else:
+        ncols = 4
+        nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols,
+                              figsize=(3.2 * ncols, 3.2 * nrows),
+                              sharey=True, sharex=True)
+    axes_flat = np.array(axes).flatten()
+
     for ai, m in enumerate(models):
-        ax = axes[ai // 4][ai % 4]
+        ax = axes_flat[ai]
         goods = []
         for jt in jtypes:
             row = sr[(sr["model"] == m) & (sr["joke_type"] == jt)]
@@ -183,10 +228,14 @@ def success_grid(sr: pd.DataFrame, out_path: Path) -> None:
         x = np.arange(len(jtypes))
         ax.bar(x, goods, color="#2ca02c")
         ax.bar(x, poors, bottom=goods, color="#d62728")
-        ax.set_title(MODEL_LABELS.get(m, m), fontsize=8)
+        ax.set_title(MODEL_LABELS.get(m, m), fontsize=9)
         ax.set_xticks(x)
-        ax.set_xticklabels([JOKE_LABELS[t][:4] for t in jtypes], fontsize=6, rotation=40)
+        ax.set_xticklabels([JOKE_LABELS[t][:4] for t in jtypes], fontsize=7, rotation=40)
         ax.set_ylim(0, 1)
+
+    # Hide any subplots beyond the n-th model
+    for ai in range(n, len(axes_flat)):
+        axes_flat[ai].set_visible(False)
 
     fig.legend(handles=[
         mpatches.Patch(color="#2ca02c", label="Good (≥4)"),
@@ -247,19 +296,26 @@ def save_replication_gap(metrics_csv: Path, out_path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
     our = pd.read_csv(metrics_csv)
-    our_gpt = our[our["model"] == "gpt-4o"].set_index("joke_type")
     metric_keys = ["sacrebleu", "rouge1", "rouge2", "rougeL", "meteor", "bertscore"]
 
+    # Compare each paper-match model (those in PAPER_TABLE2) individually.
+    # Extension models (gemma-2-*, llama-3.2-*) have no paper numbers to compare.
     rows = []
-    for jt in JOKE_TYPES:
-        for m in metric_keys:
-            pv = PAPER_TABLE2.get(jt, {}).get(m)
-            ov = float(our_gpt.loc[jt, m]) if jt in our_gpt.index and m in our_gpt.columns else None
-            diff = round(ov - pv, 4) if pv is not None and ov is not None else None
-            pct  = round((diff / pv) * 100, 1) if diff is not None and pv else None
-            rows.append({"joke_type": jt, "metric": m,
-                         "paper": pv, "ours": round(ov, 4) if ov else None,
-                         "diff": diff, "pct_diff": pct})
+    paper_match_models = [m for m in PAPER_TABLE2 if m in our["model"].unique()]
+    if not paper_match_models:
+        log.warning("No paper-match models found in metrics.csv — gap table will be empty")
+    for model_slug in paper_match_models:
+        our_model = our[our["model"] == model_slug].set_index("joke_type")
+        paper_model = PAPER_TABLE2[model_slug]
+        for jt in JOKE_TYPES:
+            for m in metric_keys:
+                pv = paper_model.get(jt, {}).get(m)
+                ov = float(our_model.loc[jt, m]) if jt in our_model.index and m in our_model.columns else None
+                diff = round(ov - pv, 4) if pv is not None and ov is not None else None
+                pct  = round((diff / pv) * 100, 1) if diff is not None and pv else None
+                rows.append({"model": model_slug, "joke_type": jt, "metric": m,
+                             "paper": pv, "ours": round(ov, 4) if ov else None,
+                             "diff": diff, "pct_diff": pct})
 
     gap = pd.DataFrame(rows)
     gap.to_csv(out_path, index=False)
@@ -278,7 +334,9 @@ def save_logistic_regression(df: pd.DataFrame, out_path: Path) -> pd.DataFrame:
     piv.columns.name = None
     piv["is_good"] = ((piv["accuracy"] >= 4) & (piv["completeness"] >= 4)).astype(int)
 
-    large = {"gpt-4o", "gemini-1.5-pro", "llama-3.1-70b", "r1-distill-llama-70b"}
+    # "Large" = the bigger model in each within-family pair you have.
+    # Gemma 2 9B (vs 2B) and Llama 3.1 8B (vs Llama 3.2 3B).
+    large = {"gemma-2-9b", "llama-3.1-8b"}
     piv["is_large"] = piv["model"].isin(large).astype(int)
     for jt in ["heterographic", "non_topical", "topical"]:
         piv[f"is_{jt}"] = (piv["joke_type"] == jt).astype(int)
@@ -311,6 +369,21 @@ def save_logistic_regression(df: pd.DataFrame, out_path: Path) -> pd.DataFrame:
 
 def save_judge_agreement(ours: pd.DataFrame, paper: pd.DataFrame,
                          out_path: Path) -> pd.DataFrame:
+    """Compute Pearson r / MAE / κ between our 7B judge and paper's 72B judge.
+
+    NOTE: For a *meaningful* calibration the two judges must rate the SAME
+    explanations. If `ours` is your judge's ratings of YOUR explanations and
+    `paper` is paper's judge's ratings of PAPER'S explanations, the merge
+    on (joke_id, model, criterion) only matches the ~2 model slugs you share
+    — and the score columns refer to *different explanation texts*. The result
+    is a noisy floor, not a real agreement number.
+
+    To get a proper calibration, run:
+        python src/judge.py --explanations data/explanations_paper.jsonl \\
+            --output outputs/ratings_judge_paper_by_ours.jsonl
+    Then point this analyze script at that file as --ratings instead.
+    A clear warning is printed when overlap is < 4 models.
+    """
     from sklearn.metrics import cohen_kappa_score
 
     merged = ours.merge(
@@ -318,9 +391,24 @@ def save_judge_agreement(ours: pd.DataFrame, paper: pd.DataFrame,
         on=["joke_id", "model", "criterion"], how="inner"
     ).rename(columns={"score": "score_ours"})
 
+    n_models_overlap = merged["model"].nunique()
+    if n_models_overlap < 4:
+        log.warning(
+            "judge_agreement: only %d models overlap between ours and paper — "
+            "this is a weak baseline, not a real judge calibration. To fix, "
+            "run the judge on paper's explanations and use that file as --ratings.",
+            n_models_overlap,
+        )
+
     rows = []
     for crit in ["accuracy", "completeness"]:
         sub = merged[merged["criterion"] == crit].copy()
+        if sub.empty:
+            rows.append({"criterion": crit, "n_paired": 0, "n_models_overlap": n_models_overlap,
+                         "pearson_r": float("nan"), "mae": float("nan"),
+                         "exact_match": float("nan"), "within_1": float("nan"),
+                         "binary_agree": float("nan"), "cohen_kappa": float("nan")})
+            continue
         r       = sub["score_ours"].corr(sub["score_paper"])
         mae     = (sub["score_ours"] - sub["score_paper"]).abs().mean()
         exact   = (sub["score_ours"] == sub["score_paper"]).mean()
@@ -329,7 +417,9 @@ def save_judge_agreement(ours: pd.DataFrame, paper: pd.DataFrame,
         sub["pass_paper"] = (sub["score_paper"] >= 4).astype(int)
         agree = (sub["pass_ours"] == sub["pass_paper"]).mean()
         kappa = cohen_kappa_score(sub["pass_paper"], sub["pass_ours"])
-        rows.append({"criterion": crit, "pearson_r": round(r, 3),
+        rows.append({"criterion": crit, "n_paired": len(sub),
+                     "n_models_overlap": n_models_overlap,
+                     "pearson_r": round(r, 3),
                      "mae": round(mae, 3), "exact_match": round(exact, 3),
                      "within_1": round(within1, 3),
                      "binary_agree": round(agree, 3), "cohen_kappa": round(kappa, 3)})
@@ -405,13 +495,7 @@ def save_hypothesis_checks(avg: pd.DataFrame, sr: pd.DataFrame,
     })
 
     # H4: larger > smaller per family (use overall success rate)
-    pairs = [
-        ("gpt-4o",               "gpt-4o-mini",          "GPT-4o family"),
-        ("gemini-1.5-pro",       "gemini-1.5-flash",     "Gemini 1.5 family"),
-        ("llama-3.1-70b",        "llama-3.1-8b",         "Llama 3.1 family"),
-        ("r1-distill-llama-70b", "r1-distill-llama-8b",  "R1 family"),
-    ]
-    for big, small, family in pairs:
+    for big, small, family, _ in H4_PAIRS:
         b = sr[sr["model"] == big]["success_rate"].mean()
         s = sr[sr["model"] == small]["success_rate"].mean()
         rows.append({
@@ -437,12 +521,15 @@ def save_hypothesis_checks(avg: pd.DataFrame, sr: pd.DataFrame,
 def print_report(avg: pd.DataFrame, sr: pd.DataFrame,
                  logreg: pd.DataFrame, gap: pd.DataFrame,
                  agreement: pd.DataFrame,
-                 out_path: Path) -> None:
+                 out_path: Path,
+                 metadata: dict | None = None) -> None:
 
-    acc = avg[avg["criterion"] == "accuracy"]
-    by_type = acc.groupby("joke_type")["mean_score"].mean()
-    hom = by_type.get("homographic", 0);  het = by_type.get("heterographic", 0)
-    ntp = by_type.get("non_topical", 0);  top = by_type.get("topical", 0)
+    acc  = avg[avg["criterion"] == "accuracy"]
+    comp = avg[avg["criterion"] == "completeness"]
+    by_type_acc  = acc.groupby("joke_type")["mean_score"].mean()
+    by_type_comp = comp.groupby("joke_type")["mean_score"].mean()
+    hom = by_type_acc.get("homographic", 0);  het = by_type_acc.get("heterographic", 0)
+    ntp = by_type_acc.get("non_topical", 0);  top = by_type_acc.get("topical", 0)
 
     lines = []
 
@@ -450,13 +537,19 @@ def print_report(avg: pd.DataFrame, sr: pd.DataFrame,
         print(text)
         lines.append(text)
 
-    emit("\n" + "=" * 64)
-    emit("  RESULTS SUMMARY")
     emit("=" * 64)
+    emit("  Apples vs Oranges — Replication Results")
+    emit("=" * 64)
+    if metadata:
+        for k, v in metadata.items():
+            emit(f"  {k:<22} {v}")
+        emit("=" * 64)
 
-    emit("\n  Avg accuracy by joke type:")
+    emit("\n  Avg scores by joke type (acc / completeness):")
     for jt in JOKE_TYPES:
-        emit(f"    {JOKE_LABELS[jt]:<16} {by_type.get(jt, 0):.3f}")
+        a = by_type_acc.get(jt, 0)
+        c = by_type_comp.get(jt, 0)
+        emit(f"    {JOKE_LABELS[jt]:<16} acc={a:.3f}  comp={c:.3f}")
 
     emit("\n  Hypothesis checks (accuracy):")
     emit(f"    H1 Puns > Reddit?        {(hom+het)/2:.3f} vs {(ntp+top)/2:.3f}  "
@@ -466,16 +559,14 @@ def print_report(avg: pd.DataFrame, sr: pd.DataFrame,
     emit(f"    H3 Topical hardest?      non_top={ntp:.3f} topical={top:.3f}  "
          f"{'CONFIRMED' if top < ntp else 'FAILED'}")
 
-    pairs = [("gpt-4o","gpt-4o-mini"),("gemini-1.5-pro","gemini-1.5-flash"),
-             ("llama-3.1-70b","llama-3.1-8b"),
-             ("r1-distill-llama-70b","r1-distill-llama-8b")]
     emit("\n    H4 Larger > Smaller?")
-    for big, small in pairs:
+    for big, small, _family, kind in H4_PAIRS:
         b = acc[acc["model"] == big]["mean_score"].mean()
         s = acc[acc["model"] == small]["mean_score"].mean()
+        tag = "" if kind == "clean" else "  [cross-gen — generation confounds size]"
         emit(f"       {'OK' if b > s else 'FAIL'}  "
              f"{MODEL_LABELS.get(big,big)} ({b:.3f}) vs "
-             f"{MODEL_LABELS.get(small,small)} ({s:.3f})")
+             f"{MODEL_LABELS.get(small,small)} ({s:.3f}){tag}")
 
     if not logreg.empty:
         emit("\n  Logistic regression (paper: β_large=1.707, β_topical=-0.574):")
@@ -492,13 +583,26 @@ def print_report(avg: pd.DataFrame, sr: pd.DataFrame,
                  f"r={r.pearson_r:.3f}  MAE={r.mae:.3f}  "
                  f"κ={r.cohen_kappa:.3f}  within±1={r.within_1:.1%}")
         emit("    (Paper reports r=0.641/0.602 for 72B vs human)")
+        # Caveat goes into the txt file, not just console
+        n_overlap = int(agreement.iloc[0]["n_models_overlap"]) if "n_models_overlap" in agreement.columns else 0
+        if n_overlap < 4:
+            emit(f"    NOTE: only {n_overlap} models overlap — this is a weak baseline,")
+            emit("          not a true judge calibration. Run judge on data/explanations_paper.jsonl")
+            emit("          and re-run analyze with --ratings on that file for proper calibration.")
 
     if not gap.empty:
-        bleu = gap[gap["metric"] == "sacrebleu"].set_index("joke_type")["pct_diff"]
-        emit("\n  Replication gap — SacreBLEU vs paper Table 2 (GPT-4o):")
-        for jt in JOKE_TYPES:
-            v = bleu.get(jt)
-            emit(f"    {JOKE_LABELS[jt]:<16} {f'{v:+.1f}%' if v else 'n/a':>8}")
+        emit("\n  Replication gap — SacreBLEU vs paper Table 2:")
+        # gap now has a `model` column (one row per model × joke_type × metric)
+        # so we print a sub-section per paper-match model
+        for model_slug, model_gap in gap.groupby("model"):
+            label = MODEL_LABELS.get(model_slug, model_slug)
+            emit(f"    [{label}]")
+            bleu = (model_gap[model_gap["metric"] == "sacrebleu"]
+                    .set_index("joke_type")["pct_diff"])
+            for jt in JOKE_TYPES:
+                v = bleu.get(jt)
+                v_str = f"{v:+.1f}%" if v is not None and not pd.isna(v) else "n/a"
+                emit(f"      {JOKE_LABELS[jt]:<14} {v_str:>8}")
         emit("    BERTScore gap is <0.5% — treated as matched.")
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -564,6 +668,16 @@ def main() -> None:
     else:
         agreement = pd.DataFrame()
 
+    # Run metadata for the header of results_summary.txt
+    from datetime import datetime
+    metadata = {
+        "run timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "ratings file":  str(args.ratings),
+        "ratings rows":  f"{len(df):,}",
+        "models in run": f"{df['model'].nunique()} ({', '.join(sorted(df['model'].unique()))})",
+        "metrics file":  str(args.metrics) if args.metrics.exists() else "(missing)",
+    }
+
     # replication
     gap = save_replication_gap(args.metrics, tab_dir / "replication_gap.csv")
 
@@ -571,7 +685,7 @@ def main() -> None:
     logreg = save_logistic_regression(df, tab_dir / "logistic_regression.csv")
 
     # summary report — printed to console and saved to file
-    print_report(avg, sr, logreg, gap, agreement,
+    print_report(avg, sr, logreg, gap, agreement, metadata=metadata,
                  out_path=args.outdir / "results_summary.txt")
 
     print(f"\n  Figures  → {fig_dir.resolve()}")

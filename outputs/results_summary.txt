@@ -1,0 +1,51 @@
+================================================================
+  Apples vs Oranges — Replication Results
+================================================================
+  run timestamp          2026-05-07 17:03:34
+  ratings file           outputs/ratings_judge.jsonl
+  ratings rows           6,000
+  models in run          5 (gemma-2-2b, gemma-2-9b, llama-3.1-8b, llama-3.2-3b, r1-distill-llama-8b)
+  metrics file           outputs/metrics.csv
+================================================================
+
+  Avg scores by joke type (acc / completeness):
+    Homographic      acc=3.687  comp=3.293
+    Heterographic    acc=3.424  comp=3.060
+    Non-Topical      acc=3.607  comp=3.076
+    Topical          acc=3.456  comp=2.964
+
+  Hypothesis checks (accuracy):
+    H1 Puns > Reddit?        3.555 vs 3.531  CONFIRMED
+    H2 Homographic > Hetero? 3.687 vs 3.424  CONFIRMED
+    H3 Topical hardest?      non_top=3.607 topical=3.456  CONFIRMED
+
+    H4 Larger > Smaller?
+       OK  Gemma 2 9B (3.628) vs Gemma 2 2B (3.453)
+       OK  Llama 3.1 8B (3.620) vs Llama 3.2 3B (3.565)  [cross-gen — generation confounds size]
+
+  Logistic regression (paper: β_large=1.707, β_topical=-0.574):
+    is_large               β=+0.046  paper=+1.707  p=1.093
+    is_heterographic       β=-0.601  paper=   n/a  p<0.001
+    is_non_topical         β=-0.648  paper=-0.511  p<0.001
+    is_topical             β=-0.954  paper=-0.574  p<0.001
+
+  Judge agreement (our 7B vs paper 72B):
+    Accuracy       r=0.244  MAE=0.718  κ=0.221  within±1=86.7%
+    Completeness   r=0.291  MAE=0.654  κ=0.273  within±1=90.2%
+    (Paper reports r=0.641/0.602 for 72B vs human)
+    NOTE: only 2 models overlap — this is a weak baseline,
+          not a true judge calibration. Run judge on data/explanations_paper.jsonl
+          and re-run analyze with --ratings on that file for proper calibration.
+
+  Replication gap — SacreBLEU vs paper Table 2:
+    [Llama 3.1 8B]
+      Homographic      +18.3%
+      Heterographic    -13.9%
+      Non-Topical      +14.1%
+      Topical          +19.2%
+    [R1-Llama 8B]
+      Homographic      +48.6%
+      Heterographic     +9.8%
+      Non-Topical      +37.4%
+      Topical          +33.2%
+    BERTScore gap is <0.5% — treated as matched.
