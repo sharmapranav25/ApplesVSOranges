@@ -12,10 +12,10 @@ All tasks complete; **27 tests passing**. This file is the at-a-glance briefing 
 | `src/metrics.py` (BLEU/ROUGE/METEOR/BERTScore) | ✅ implemented |
 | `src/analyze.py` — figures + tables + summary | ✅ implemented |
 | `src/extension.py` — Not yet created | ⚠️ pending |
-| `data/explanations.jsonl` | ✅ 4,800 rows — model explanations extracted from paper's released CSV |
-| `outputs/ratings_judge.jsonl` | ✅ 9,600 rows — our Qwen-7B judge, via `run_judge.ipynb` |
+| `data/explanations.jsonl` | ✅ 3,000 rows — 5 models × 600 jokes (own inference) |
+| `outputs/ratings_judge.jsonl` | ✅ 6,000 rows — Qwen-7B judge over our 5 models, via `run_judge.ipynb` |
 | `outputs/ratings_judge_paper.jsonl` | ✅ 9,600 Qwen-72B baseline ratings extracted from CSV |
-| `outputs/metrics.csv` | ✅ 32 rows (8 models × 4 types) |
+| `outputs/metrics.csv` | ✅ 20 rows (5 models × 4 types) |
 | `outputs/figures/` (4 figures) | ✅ fig3b, fig3c, fig4, judge comparison |
 | `outputs/tables/` (6 tables) | ✅ avg scores, success rates, gap, logreg, agreement, hypothesis checks |
 | `outputs/results_summary.txt` | ✅ full console output saved on every `src/analyze.py` run |
@@ -57,8 +57,8 @@ Instead of zero-shot, provide 1–2 example jokes with gold explanations in the 
 
 - **CSV `Index` column is null for hom/het/non-topical** (only `topical` has it). `source_index` is therefore optional. Don't join on it — use `assign_joke_ids()` in `src/preprocess.py`, which assigns `{type}_{NNN}` by within-type CSV row order.
 - **Rubric ordering trap:** rubric files are ASCENDING (0→5). `tests/test_rubric.py` enforces this — don't "fix" it.
-- **Replication gap (documented):** BLEU/ROUGE/METEOR runs 4–15% above baseline; BERTScore matches within ±0.5%. Gap reflects tokenizer choices. Don't chase this further — see `outputs/tables/replication_gap.csv`.
-- **H1/H3 near-ties:** our Qwen-7B judge concentrates scores at 4, reducing sensitivity to joke difficulty differences. Directional findings hold in success-rate analysis. See `status_task3_judge.md`.
+- **Replication gap:** vs paper Table 2, Llama 3.1 8B SacreBLEU within ±20%; R1-Llama 8B runs higher (+10 to +49%). BERTScore matches within ±0.5%. Gap reflects unspecified tokenizer/aggregation choices in the paper. See `outputs/tables/replication_gap.csv`.
+- **H1 near-tie:** H1 (puns vs Reddit) is a near-tie at Δ=0.024 in accuracy because the 7B judge concentrates scores around 4, compressing the distinction. H2, H3, and the Gemma 2 9B-vs-2B H4 pair are all cleanly confirmed; the cross-generation H4 pair (Llama 3.1 8B vs Llama 3.2 3B) is also near-tied. See `outputs/tables/hypothesis_checks.csv`.
 - **WSL judge setup:** Ollama daemon must be started manually each WSL session (`ollama serve`). GPU passthrough requires Windows NVIDIA driver ≥ 527.41. Set `OLLAMA_NUM_GPU=-1` for full GPU utilisation. See `run_judge.ipynb` for full setup.
 
 ---
