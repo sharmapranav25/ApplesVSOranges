@@ -1,11 +1,13 @@
-# How to run — Apples vs Oranges replication (Member 1 components)
+# How to run — Apples vs Oranges replication
 
-End-to-end run of the four Member-1 build tasks. Every step is idempotent and resumable.
+End-to-end run of all tasks. Every step is idempotent and resumable.
 
 ## 0. One-time setup
 
 ```bash
-cd "/path/to/apples vs oranges/"
+cd /mnt/d/ApplesVSOranges
+conda create -n applesVsOranges python=3.10 -y  # create a new conda environment (recommended) (optional)
+conda activate applesVsOranges #  (optional)
 
 # Python deps
 pip install -r requirements.txt
@@ -24,17 +26,7 @@ python src/preprocess.py --input new_jokes.csv --output data/jokes.jsonl
 
 Output: 600 lines, 150 per type (`homographic`/`heterographic`/`non_topical`/`topical`), schema `{id, type, joke, reference_explanation, source_index}`.
 
-## 2. (dev) Build `data/explanations.jsonl` from CSV  (placeholder until teammate's file lands)
-
-```bash
-python src/make_explanations_from_csv.py \
-    --input new_jokes.csv \
-    --output data/explanations.jsonl
-```
-
-Output: 4800 lines (600 jokes × 8 models). Swap with teammate's deliverable when ready; verify model slugs match `MODEL_SLUG_MAP` in `src/schema.py`.
-
-Optional: dump the paper's own Qwen-72B ratings as a cross-scale baseline:
+## 2. Build `data/explanations.jsonl`
 
 ```bash
 python src/make_explanations_from_csv.py \
@@ -44,15 +36,23 @@ python src/make_explanations_from_csv.py \
 
 ## 3. Rubric files  (Task 2)
 
-Static — no run step. `prompts/rubric_accuracy.txt`, `prompts/rubric_completeness.txt`, `prompts/judge_template.txt` ship verbatim. **Do not re-order** (paper §4.3 prints descending; A.6 says judge gets ascending — files are ascending; `tests/test_rubric.py` enforces).
-
-## 4. Run the LLM-as-a-judge  (Task 3)
+## 3. Run the judge → `outputs/ratings_judge.jsonl`
 
 **Model: Qwen2.5-7B-Instruct** (deviation from paper's 72B — see `status_task3_judge.md`).
 
-Four backends. Pick one:
+Pick one option:
 
-### 4a. Ollama — local, free  ⭐ recommended on Mac
+### 3a. Notebook — recommended (Windows WSL + GPU or Google Colab)
+
+```bash
+jupyter notebook run_judge.ipynb
+```
+
+Works through setup, GPU verification, smoke test, and full 9,600-call run interactively.
+Resumable — re-run the full-run cell to pick up after any interruption.
+Expected time: ~2–3 hrs with GPU.
+
+### 3b. Command line — alternative
 
 ```bash
 brew install ollama                                 # one-time
@@ -77,85 +77,55 @@ Cost: ~$0.50–2 at 7B prices. Minutes, not hours.
 ### 4c. Together — paid alternative (free signup credit ~$5)
 
 ```bash
-export TOGETHER_API_KEY=...
-python src/judge.py --resume --backend together
+python src/judge.py --backend ollama --limit 4
 ```
 
-### 4d. Local (HPC node only)
-
-```bash
-python src/judge.py --resume --backend local
-```
-
-`transformers` + `bitsandbytes` 4-bit. **Will not run on macOS** — bitsandbytes has no Darwin wheel. Use Ollama instead on Mac.
-
-### Smoke run (any backend)
-
-```bash
-python src/judge.py --backend ollama --limit 4      # 4 calls, ~10s
-```
-
-Errors logged to `outputs/judge.errors.log`; never crashes mid-run.
-
-## 5. Compute automatic metrics  (Task 4)
+## 4. Compute automatic metrics → `outputs/metrics.csv`
 
 ```bash
 python src/metrics.py --resume
-# → outputs/metrics.csv  (32 rows: 8 models × 4 joke types)
 ```
 
-Local-only, free. Time on Mac CPU is dominated by BERTScore (`roberta-large`); estimate 15–30 min for the full 31-bucket backfill.
+Output: 32 rows (8 models × 4 joke types). Takes ~15–30 min (dominated by BERTScore).
 
-Restrict for debugging:
+## 5. Produce figures, tables, and summary
 
 ```bash
-python src/metrics.py --models gpt-4o --types homographic   # single bucket
-python src/metrics.py --limit 50                            # cap explanations
+python src/analyze.py
 ```
 
-`--bertscore-batch-size 64` (or higher) on a GPU node.
+Output:
+- `outputs/figures/` — 4 figures (Fig 3b, 3c, 4, judge comparison)
+- `outputs/tables/` — 6 tables (avg scores, success rates, gap, logistic regression, judge agreement, hypothesis checks)
+- `outputs/results_summary.txt` — full results printed to file
 
 ## 6. Tests
 
 ```bash
-pytest tests/ -v        # 27 tests; the heaviest is the BERTScore sanity check on GPT-4o/hom
+pytest tests/ -v    # all 27 should pass
 ```
-
-Skips automatically if dependencies (e.g. `data/explanations.jsonl`) are absent. Tolerances on the paper sanity check are intentionally loose — see CLAUDE.md "Replication gap (documented)".
-
-## 7. (Optional) Cross-scale κ vs paper's 72B baseline
-
-Once `outputs/ratings_judge.jsonl` exists, compute Cohen's κ vs `outputs/ratings_judge_paper.jsonl` per (model, criterion) bucket. We use Qwen-7B; the paper-baseline is Qwen-72B → expect modest agreement, not high. This is a quality lower bound, not a same-model reproducibility check. One-off notebook is fine; not yet automated.
-
-## Common flags (all scripts)
-
-| Flag | Effect |
-|---|---|
-| `--limit N` | cap rows / calls processed (debug) |
-| `--resume` | skip rows already present in `--output` |
-| `--input`, `--output` | override default paths |
 
 ## Quick end-to-end
 
-### Free path (Mac, ~5 hrs total — judge is the long pole)
 ```bash
+## Optional: setup conda env
+# conda create -n applesVsOranges python=3.10 -y
+# conda activate applesVsOranges
 ollama serve &
 ollama pull qwen2.5:7b-instruct-q4_K_M
 python src/preprocess.py
 python src/make_explanations_from_csv.py
-python src/judge.py --backend ollama --resume     # ~3–5 hrs
-python src/metrics.py --resume                    # ~10 min
+jupyter notebook run_judge.ipynb                         # ~2–3 hrs with GPU
+# OR:  python src/judge.py --backend ollama --resume     # ~3–5 hrs
+python src/metrics.py --resume                           # ~10 min
+python src/analyze.py                                    # ~30 sec
 pytest tests/ -v
 ```
 
-### Paid path (~10 min total)
-```bash
-export OPENROUTER_API_KEY=sk-or-...
-python src/preprocess.py
-python src/make_explanations_from_csv.py
-python src/judge.py --resume                      # ~minutes
-python src/metrics.py --resume                    # ~10 min
-pytest tests/ -v
-```
+## Common flags
 
-Outputs land in `outputs/`. Logs land alongside (`outputs/*.errors.log`, `outputs/metrics_run.log`).
+| Flag | Effect |
+|---|---|
+| `--limit N` | cap rows processed (useful for debugging) |
+| `--resume` | skip rows already in the output file |
+| `--input`, `--output` | override default paths |

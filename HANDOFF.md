@@ -10,12 +10,15 @@ EMNLP 2025 Findings paper (Loakman et al., humour explanation). All 4 build task
 | `prompts/rubric_*.txt`, `judge_template.txt` | ✅ verbatim from §4.3 / A.6, ascending 0→5 |
 | `src/judge.py` (**Qwen2.5-7B**, deviation from paper's 72B) | ✅ implemented, resumable, switchable backend — **not yet run** against the real API |
 | `src/metrics.py` (BLEU/ROUGE/METEOR/BERTScore) | ✅ implemented, sanity-checked against Table 2 |
-| `data/explanations.jsonl` | ⚠️ dev copy derived from CSV; **swap when teammate delivers** |
-| `outputs/ratings_judge.jsonl` | ❌ not yet produced — run the judge |
+| `data/explanations.jsonl` | ✅ 3,000 rows — 5 models × 600 jokes (own inference) |
+| `outputs/ratings_judge.jsonl` | ✅ 6,000 Qwen-7B ratings (5 models × 600 × 2 criteria) via `run_judge.ipynb` |
 | `outputs/ratings_judge_paper.jsonl` | ✅ 9600 paper-Qwen-**72B** ratings extracted from CSV (cross-scale baseline only — we judge with 7B) |
-| `outputs/metrics.csv` | partial (1 row from a smoke run) — re-run for the full 32 |
+| `outputs/metrics.csv` | ✅ 20 rows (5 models × 4 types) |
+| **`src/analyze.py`** — figures + tables | ✅ **all outputs produced** |
+| **`outputs/figures/`** (4 figures) | ✅ fig3b, fig3c, fig4, judge comparison |
+| **`outputs/tables/`** (5 tables) | ✅ avg scores, success rates, gap, logreg, agreement |
 
-## Next steps (in order)
+## Next steps (in order) (DONE)
 
 1. **When teammate's `data/explanations.jsonl` arrives**, replace the dev copy and verify model slugs match `MODEL_SLUG_MAP` in `src/schema.py`.
 2. Run the judge → `outputs/ratings_judge.jsonl`. ~9600 calls. Pick one:
@@ -28,7 +31,7 @@ EMNLP 2025 Findings paper (Loakman et al., humour explanation). All 4 build task
 
 - **CSV `Index` column is null for hom/het/non-topical** (only `topical` has it). `source_index` is therefore optional. Don't join on it — use `assign_joke_ids()` in `src/preprocess.py`, which assigns `{type}_{NNN}` by within-type CSV row order.
 - **Rubric ordering trap:** paper §4.3 presents the rubric DESCENDING; A.6 says the judge gets it ASCENDING. Files are ascending. `tests/test_rubric.py` enforces — don't "fix" it.
-- **Replication gap (documented):** my BLEU/ROUGE/METEOR runs ~10–25% above paper's Table 2 numbers; BERTScore is essentially exact (0.890 vs 0.88). Paper doesn't publish its metric code; the gap reflects unspecified tokenizer/aggregation choices. Sanity-test tolerances are loose accordingly. **Don't chase this further** unless the paper's code drops.
+- **Replication gap (per paper-match model):** Llama 3.1 8B SacreBLEU +18.3% / -13.9% / +14.1% / +19.2% (hom/het/non/top); R1-Llama 8B +48.6% / +9.8% / +37.4% / +33.2%. BERTScore matches within ±0.5%. Gap reflects unspecified tokenizer/aggregation choices in the paper. See `outputs/tables/replication_gap.csv`.
 - **macOS judge backend:** `bitsandbytes` has no Darwin wheel → `--backend local` won't run on this laptop. **Use `--backend ollama`** (free, local, ~3–5 hrs) or `--backend openrouter` (paid, ~$1, minutes). Ollama is the recommended free path; setup is `brew install ollama && ollama serve & && ollama pull qwen2.5:7b-instruct-q4_K_M`.
 
 ## Layout

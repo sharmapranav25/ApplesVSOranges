@@ -1,0 +1,6 @@
+hypothesis,description,value_a,label_a,value_b,label_b,delta,verdict,note
+H1,Traditional puns easier to explain than Reddit jokes,3.5553,puns (avg hom+het accuracy),3.5313,reddit (avg ntp+top accuracy),0.024,NEAR-TIE,Δ<0.05 → near-tie due to 7B judge score compression
+H2,Homographic puns easier than heterographic puns,3.6867,homographic accuracy,3.424,heterographic accuracy,0.2627,CONFIRMED,
+H3,Topical jokes harder than non-topical Reddit jokes,3.6067,non_topical accuracy,3.456,topical accuracy,0.1507,CONFIRMED,Δ<0.05 → near-tie due to 7B judge score compression
+H4,Larger model > smaller model — Gemma 2 family (9B vs 2B),0.1833,gemma-2-9b success rate,0.1083,gemma-2-2b success rate,0.075,CONFIRMED,
+H4,"Larger model > smaller model — Llama family (3.1-8B vs 3.2-3B, cross-gen)",0.395,llama-3.1-8b success rate,0.3667,llama-3.2-3b success rate,0.0283,NEAR-TIE,near-tied
