@@ -65,14 +65,17 @@ JOKE_LABELS = {
     "topical":       "Topical",
 }
 
-# Your 5 models — paper-match models first, then extension models.
+# Your 8 models — paper-match models first, then extension models.
 # Fallback to paper models if this file is run on paper data directly.
 MODEL_ORDER = [
-    "r1-distill-llama-8b",   # paper match
+    "r1-distill-llama-8b",    # paper match
     "llama-3.1-8b",           # paper match
     "llama-3.2-3b",           # extension
     "gemma-2-2b",             # extension (small Gemma — H4 pair)
     "gemma-2-9b",             # extension (large Gemma — H4 pair)
+    "mistral-7b",             # extension (new family baseline)
+    "phi-3-mini",             # extension (small Phi — H4 pair)
+    "phi-3-medium",           # extension (large Phi — H4 pair)
     # paper-only models kept so plots work if run on ratings_judge_paper.jsonl too
     "r1-distill-llama-70b", "gpt-4o", "gpt-4o-mini",
     "gemini-1.5-pro", "gemini-1.5-flash", "llama-3.1-70b",
@@ -83,19 +86,24 @@ MODEL_LABELS = {
     "llama-3.2-3b":         "Llama 3.2 3B",
     "gemma-2-2b":           "Gemma 2 2B",
     "gemma-2-9b":           "Gemma 2 9B",
+    "mistral-7b":           "Mistral 7B",
+    "phi-3-mini":           "Phi-3 Mini",
+    "phi-3-medium":         "Phi-3 Medium",
     # paper models
     "r1-distill-llama-70b": "R1 70B",    "gpt-4o":          "GPT-4o",
     "gpt-4o-mini":          "GPT-4o Mini","gemini-1.5-pro":  "Gemini Pro",
     "gemini-1.5-flash":     "Gemini Flash","llama-3.1-70b":  "Llama 70B",
-    "llama-3.1-8b":         "Llama 3.1 8B",
 }
-# One colour per MODEL_ORDER entry (first 5 = your models)
+# One colour per MODEL_ORDER entry (first 8 = your models)
 MODEL_COLORS = [
     "#555555",  # R1-Llama 8B      — dark grey
     "#1f77b4",  # Llama 3.1 8B     — dark blue
     "#aec7e8",  # Llama 3.2 3B     — light blue
     "#98df8a",  # Gemma 2 2B       — light green
     "#2ca02c",  # Gemma 2 9B       — dark green
+    "#ff7f0e",  # Mistral 7B       — orange
+    "#c5b0d5",  # Phi-3 Mini       — light purple
+    "#9467bd",  # Phi-3 Medium     — dark purple
     # fallback colours for paper models (used only when running on paper data)
     "#aaaaaa", "#d62728", "#ff9896", "#e377c2", "#f7b6d2", "#8c564b",
 ]
@@ -105,6 +113,7 @@ MODEL_COLORS = [
 H4_PAIRS = [
     # (big_model, small_model, family_label, h4_kind)
     ("gemma-2-9b",   "gemma-2-2b",   "Gemma 2 family (9B vs 2B)",                    "clean"),
+    ("phi-3-medium", "phi-3-mini",   "Phi-3 family (Medium 14B vs Mini 3.8B)",       "clean"),
     ("llama-3.1-8b", "llama-3.2-3b", "Llama family (3.1-8B vs 3.2-3B, cross-gen)",   "cross-gen"),
 ]
 
@@ -335,8 +344,8 @@ def save_logistic_regression(df: pd.DataFrame, out_path: Path) -> pd.DataFrame:
     piv["is_good"] = ((piv["accuracy"] >= 4) & (piv["completeness"] >= 4)).astype(int)
 
     # "Large" = the bigger model in each within-family pair you have.
-    # Gemma 2 9B (vs 2B) and Llama 3.1 8B (vs Llama 3.2 3B).
-    large = {"gemma-2-9b", "llama-3.1-8b"}
+    # Gemma 2 9B (vs 2B), Llama 3.1 8B (vs Llama 3.2 3B), and Phi-3 Medium 14B (vs Phi-3 Mini 3.8B).
+    large = {"gemma-2-9b", "llama-3.1-8b", "phi-3-medium"}
     piv["is_large"] = piv["model"].isin(large).astype(int)
     for jt in ["heterographic", "non_topical", "topical"]:
         piv[f"is_{jt}"] = (piv["joke_type"] == jt).astype(int)
