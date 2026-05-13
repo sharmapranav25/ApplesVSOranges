@@ -1,0 +1,4 @@
+{"joke_id": "homographic_000", "model": "r1-distill-llama-8b", "criterion": "accuracy", "score": 0, "annotator": "qwen2.5-7b-instruct"}
+{"joke_id": "homographic_000", "model": "r1-distill-llama-8b", "criterion": "completeness", "score": 1, "annotator": "qwen2.5-7b-instruct"}
+{"joke_id": "homographic_001", "model": "r1-distill-llama-8b", "criterion": "accuracy", "score": 4, "annotator": "qwen2.5-7b-instruct"}
+{"joke_id": "homographic_001", "model": "r1-distill-llama-8b", "criterion": "completeness", "score": 4, "annotator": "qwen2.5-7b-instruct"}
