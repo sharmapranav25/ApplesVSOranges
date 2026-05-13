@@ -1,0 +1,6 @@
+model,heterographic,homographic,non_topical,topical,avg_rank
+llama-3.1-8b,1.0,2.0,1.0,1.0,1.25
+llama-3.2-3b,2.0,1.0,3.0,4.0,2.5
+r1-distill-llama-8b,4.0,4.0,2.0,2.0,3.0
+gemma-2-9b,3.0,3.0,4.0,3.0,3.25
+gemma-2-2b,5.0,5.0,5.0,5.0,5.0
